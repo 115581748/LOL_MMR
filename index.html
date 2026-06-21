@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="用交互动画解释英雄联盟排位中的 MMR、Rank、LP、匹配与 Elo 叙事。">
+  <title>峡谷天平｜看懂 MMR、Rank 与 LP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="返回顶部">
+      <span class="brand-mark">◇</span>
+      <span>峡谷天平</span>
+    </a>
+    <nav aria-label="章节导航">
+      <a href="#layers">四层机制</a>
+      <a href="#rift-model">峡谷模型</a>
+      <a href="#extreme-cases">极端对局</a>
+      <a href="#simulator">LP 模拟器</a>
+      <a href="#myths">叙事拆解</a>
+    </nav>
+    <button class="sound-toggle" id="motionToggle" type="button" aria-pressed="false">暂停动画</button>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">LEAGUE RANKED SYSTEM · MECHANISM, NOT MYTH</p>
+        <h1>系统看见的你，<br><em>不只有一个段位。</em></h1>
+        <p class="hero-lead">MMR 是隐藏估计，Rank 是可见身份，LP 是两者之间的校准信号。匹配系统则在公平、位置与等待时间之间寻找一个可行解。</p>
+        <div class="hero-actions">
+          <a class="primary-btn" href="#layers">开始拆解 <span>↓</span></a>
+          <button class="text-btn" id="quickDemo" type="button">播放 30 秒机制演示</button>
+        </div>
+        <div class="hero-proof">
+          <span><b>官方明确</b> MMR / Rank / LP</span>
+          <span><b>机制示例</b> Rank 与 MMR 可以错位</span>
+          <span><b>尚未证明</b> “败者组”与系统制裁</span>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-label="MMR、Rank 与 LP 的动态关系示意图">
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <div class="core">
+          <span class="core-label">HIDDEN</span>
+          <strong id="heroMmr">1628</strong>
+          <small>MMR ESTIMATE</small>
+        </div>
+        <div class="rank-card floating-card">
+          <span>VISIBLE RANK</span>
+          <strong>翡翠 II</strong>
+          <small>当前 43 LP</small>
+        </div>
+        <div class="lp-card floating-card">
+          <span>CALIBRATION</span>
+          <strong class="positive">+27 / −21</strong>
+          <small>MMR 高于 Rank</small>
+        </div>
+        <div class="match-card floating-card">
+          <span>MATCH FOUND</span>
+          <div class="teams">
+            <i></i><i></i><i></i><i></i><i></i>
+            <b>VS</b>
+            <i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <small>平均 MMR 接近 · 约束并存</small>
+        </div>
+        <svg class="connection-lines" viewBox="0 0 620 620" aria-hidden="true">
+          <path d="M310 310 C205 210 170 180 92 145"/>
+          <path d="M310 310 C440 215 462 160 530 125"/>
+          <path d="M310 310 C415 420 485 430 540 492"/>
+        </svg>
+      </div>
+    </section>
+
+    <section class="ticker" aria-label="核心概念">
+      <div class="ticker-track">
+        <span>MMR ≠ RANK</span><i>✦</i><span>LP 是校准信号</span><i>✦</i><span>50% 是均衡结果</span><i>✦</i><span>匹配平衡的是队伍整体</span><i>✦</i>
+        <span>MMR ≠ RANK</span><i>✦</i><span>LP 是校准信号</span><i>✦</i><span>50% 是均衡结果</span><i>✦</i><span>匹配平衡的是队伍整体</span><i>✦</i>
+      </div>
+    </section>
+
+    <section class="section intro" id="layers">
+      <div class="section-heading">
+        <p class="eyebrow">01 · THE FOUR-LAYER MODEL</p>
+        <h2>先把一团“Elo”<br>拆成四台不同的机器</h2>
+        <p>玩家口中的 Elo 往往把隐藏分、段位、LP、队友质量与连败体验揉在一起。机制分析的第一步，是不让它们串台。</p>
+      </div>
+
+      <div class="layer-stage" id="layerStage">
+        <div class="layer-tabs" role="tablist" aria-label="四层机制">
+          <button class="layer-tab active" data-layer="0" role="tab" aria-selected="true"><b>01</b> 隐藏评分</button>
+          <button class="layer-tab" data-layer="1" role="tab" aria-selected="false"><b>02</b> 外显身份</button>
+          <button class="layer-tab" data-layer="2" role="tab" aria-selected="false"><b>03</b> 校准信号</button>
+          <button class="layer-tab" data-layer="3" role="tab" aria-selected="false"><b>04</b> 对局构造</button>
+        </div>
+
+        <div class="layer-visual">
+          <div class="layer-stack">
+            <article class="stack-card active" data-card="0">
+              <div class="stack-icon mmr-icon"><span>μ</span><i></i></div>
+              <div><small>HIDDEN ESTIMATE</small><h3>MMR</h3></div>
+              <p>系统内部对你当前排位实力的估计。胜利上升，失败下降；真实数值不可见。</p>
+            </article>
+            <article class="stack-card" data-card="1">
+              <div class="stack-icon rank-icon">Ⅲ</div>
+              <div><small>VISIBLE IDENTITY</small><h3>Rank</h3></div>
+              <p>黄金、翡翠、钻石……它把隐藏估计翻译成玩家可读的进度与身份，但不等于 MMR。</p>
+            </article>
+            <article class="stack-card" data-card="2">
+              <div class="stack-icon lp-icon">LP</div>
+              <div><small>CALIBRATION SIGNAL</small><h3>League Points</h3></div>
+              <p>当 MMR 与 Rank 错位时，LP 的赢/输幅度帮助两者重新靠拢。</p>
+            </article>
+            <article class="stack-card" data-card="3">
+              <div class="stack-icon queue-icon"><i></i><i></i><i></i></div>
+              <div><small>MULTI-OBJECTIVE SYSTEM</small><h3>Matchmaking</h3></div>
+              <p>在队伍公平、位置偏好、等待时间、自动补位与在线玩家池之间折中。</p>
+            </article>
+          </div>
+          <aside class="layer-note">
+            <span id="layerKicker">官方明确</span>
+            <h3 id="layerTitle">MMR 是估计，不是“系统情绪”</h3>
+            <p id="layerText">把它想成系统持续更新的一张内部成绩单。评分系统研究常用“均值 + 不确定性”描述实力，但 Riot 并未公开英雄联盟 MMR 的完整公式。</p>
+            <div class="certainty">
+              <span>证据强度</span>
+              <div><i id="certaintyBar" style="width: 96%"></i></div>
+              <b id="certaintyLabel">官方机制</b>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="rift-section" id="rift-model">
+      <div class="rift-atmosphere" aria-hidden="true"></div>
+      <div class="rift-shell">
+        <div class="section-heading">
+          <p class="eyebrow">02 · ONE MATCH, TWO RATING LAYERS</p>
+          <h2>同一场峡谷对局里，<br>Rank 和 MMR 可以并不相同。</h2>
+          <p>下面是一场教学示例：Rank 是玩家实际看见的段位与 LP；MMR 是为了说明机制而设置的隐藏示例值。系统更关心两队整体是否接近，而不是让十个人的可见段位完全一样。</p>
+        </div>
+
+        <div class="match-example">
+          <div class="match-summary">
+            <div class="summary-team blue-summary"><span>蓝方平均隐藏 MMR</span><strong>1508</strong><small>平均可见段位：翡翠 II</small></div>
+            <div class="summary-center">
+              <span>双方平均分差</span><strong>16</strong>
+              <div class="summary-scale"><i style="left:54%"></i></div>
+              <small>经典 Elo 教学模型：蓝方约 52.3% · 红方约 47.7%</small>
+            </div>
+            <div class="summary-team red-summary"><span>红方平均隐藏 MMR</span><strong>1492</strong><small>平均可见段位：翡翠 II</small></div>
+          </div>
+          <div class="gap-definition">
+            <span><b>个人差值 Δ</b> = 隐藏 MMR − Rank 教学参考值</span>
+            <span class="gap-positive">正差：MMR 高于 Rank</span>
+            <span class="gap-neutral">接近：两层基本一致</span>
+            <span class="gap-negative">负差：MMR 低于 Rank</span>
+            <small>Riot 未公开 Rank 与 MMR 的固定换算；参考值仅服务于本页示例。</small>
+          </div>
+
+          <div class="match-grid">
+            <div class="team-roster blue-roster" aria-label="蓝方玩家">
+              <h3><span>BLUE SIDE</span> 蓝方玩家</h3>
+              <button class="player-card active" type="button" data-player="blue-top">
+                <img src="assets/champions/Garen.png" alt="盖伦">
+                <span class="player-role">TOP</span>
+                <span class="player-name">蓝方上路</span>
+                <span class="player-rank"><small>实际 Rank</small><b>翡翠 I · 62 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1580</b><em class="mmr-gap positive">Δ +40</em></span>
+              </button>
+              <button class="player-card" type="button" data-player="blue-jungle">
+                <img src="assets/champions/LeeSin.png" alt="李青">
+                <span class="player-role">JNG</span>
+                <span class="player-name">蓝方打野</span>
+                <span class="player-rank"><small>实际 Rank</small><b>翡翠 II · 18 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1515</b><em class="mmr-gap neutral">Δ +15</em></span>
+              </button>
+              <button class="player-card" type="button" data-player="blue-mid">
+                <img src="assets/champions/Ahri.png" alt="阿狸">
+                <span class="player-role">MID</span>
+                <span class="player-name">蓝方中路</span>
+                <span class="player-rank"><small>实际 Rank</small><b>翡翠 II · 45 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1540</b><em class="mmr-gap positive">Δ +40</em></span>
+              </button>
+              <button class="player-card" type="button" data-player="blue-bottom">
+                <img src="assets/champions/Jinx.png" alt="金克丝">
+                <span class="player-role">BOT</span>
+                <span class="player-name">蓝方下路</span>
+                <span class="player-rank"><small>实际 Rank</small><b>翡翠 III · 77 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1470</b><em class="mmr-gap neutral">Δ +10</em></span>
+              </button>
+              <button class="player-card" type="button" data-player="blue-support">
+                <img src="assets/champions/Thresh.png" alt="锤石">
+                <span class="player-role">SUP</span>
+                <span class="player-name">蓝方辅助</span>
+                <span class="player-rank"><small>实际 Rank</small><b>白金 I · 84 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1435</b><em class="mmr-gap neutral">Δ +15</em></span>
+              </button>
+            </div>
+
+            <div class="map-column">
+              <div class="rift-map-frame">
+                <img src="assets/map11.png" alt="召唤师峡谷小地图">
+                <span class="map-role blue-dot blue-top" data-map-player="blue-top">TOP</span>
+                <span class="map-role blue-dot blue-jungle" data-map-player="blue-jungle">JNG</span>
+                <span class="map-role blue-dot blue-mid" data-map-player="blue-mid">MID</span>
+                <span class="map-role blue-dot blue-bottom" data-map-player="blue-bottom">BOT</span>
+                <span class="map-role blue-dot blue-support" data-map-player="blue-support">SUP</span>
+                <span class="map-role red-dot red-top" data-map-player="red-top">TOP</span>
+                <span class="map-role red-dot red-jungle" data-map-player="red-jungle">JNG</span>
+                <span class="map-role red-dot red-mid" data-map-player="red-mid">MID</span>
+                <span class="map-role red-dot red-bottom" data-map-player="red-bottom">BOT</span>
+                <span class="map-role red-dot red-support" data-map-player="red-support">SUP</span>
+              </div>
+              <div class="selected-player">
+                <span id="selectedRole">蓝方上路 · TOP</span>
+                <strong id="selectedComparison">翡翠 I 62 LP <i>≠</i> MMR 1580</strong>
+                <div class="selected-gap">
+                  <span>Rank 教学参考值 <b id="selectedRankRef">1540</b></span>
+                  <em id="selectedDelta" class="positive">Δ +40</em>
+                </div>
+                <p id="selectedExplanation">这名玩家的 MMR 高于当前可见 Rank，因此他的 LP 变化可能更偏向“赢得多、输得少”。</p>
+              </div>
+              <p class="example-disclaimer">点击任意玩家查看。所有 Rank、LP 与 MMR 数字均为机制教学示例，不代表真实账号或 Riot 的段位换算表。</p>
+            </div>
+
+            <div class="team-roster red-roster" aria-label="红方玩家">
+              <h3><span>RED SIDE</span> 红方玩家</h3>
+              <button class="player-card" type="button" data-player="red-top">
+                <img src="assets/champions/Darius.png" alt="德莱厄斯">
+                <span class="player-role">TOP</span>
+                <span class="player-name">红方上路</span>
+                <span class="player-rank"><small>实际 Rank</small><b>翡翠 II · 71 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1510</b><em class="mmr-gap neutral">Δ +10</em></span>
+              </button>
+              <button class="player-card" type="button" data-player="red-jungle">
+                <img src="assets/champions/Viego.png" alt="佛耶戈">
+                <span class="player-role">JNG</span>
+                <span class="player-name">红方打野</span>
+                <span class="player-rank"><small>实际 Rank</small><b>翡翠 II · 34 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1530</b><em class="mmr-gap positive">Δ +30</em></span>
+              </button>
+              <button class="player-card" type="button" data-player="red-mid">
+                <img src="assets/champions/Yasuo.png" alt="亚索">
+                <span class="player-role">MID</span>
+                <span class="player-name">红方中路</span>
+                <span class="player-rank"><small>实际 Rank</small><b>翡翠 II · 92 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1455</b><em class="mmr-gap negative">Δ −45</em></span>
+              </button>
+              <button class="player-card" type="button" data-player="red-bottom">
+                <img src="assets/champions/Kaisa.png" alt="卡莎">
+                <span class="player-role">BOT</span>
+                <span class="player-name">红方下路</span>
+                <span class="player-rank"><small>实际 Rank</small><b>翡翠 II · 8 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1505</b><em class="mmr-gap neutral">Δ +5</em></span>
+              </button>
+              <button class="player-card" type="button" data-player="red-support">
+                <img src="assets/champions/Lulu.png" alt="璐璐">
+                <span class="player-role">SUP</span>
+                <span class="player-name">红方辅助</span>
+                <span class="player-rank"><small>实际 Rank</small><b>白金 I · 96 LP</b></span>
+                <span class="player-mmr"><small>隐藏 MMR 示例</small><b>1460</b><em class="mmr-gap positive">Δ +40</em></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section extreme-section" id="extreme-cases">
+      <div class="section-heading">
+        <p class="eyebrow">02B · EXTREME MATCH EXAMPLES</p>
+        <h2>所谓“上等马、下等马”，<br>在数字上可能长什么样？</h2>
+        <p>队伍平均 MMR 接近，并不要求五个位置逐一相等。下面用四组刻意放大的教学数据，展示内部离散、连胜后 MMR 超前、连败后 Rank 超前等情况。</p>
+      </div>
+
+      <div class="extreme-lab">
+        <div class="extreme-tabs" role="tablist" aria-label="极端对局示例">
+          <button class="extreme-tab active" data-extreme="horse" type="button"><b>01</b> 上等马带下等马</button>
+          <button class="extreme-tab" data-extreme="offset" type="button"><b>02</b> 分路强弱对冲</button>
+          <button class="extreme-tab" data-extreme="winstreak" type="button"><b>03</b> 连胜后 MMR 超前</button>
+          <button class="extreme-tab" data-extreme="lossstreak" type="button"><b>04</b> 连败后 Rank 超前</button>
+        </div>
+
+        <div class="extreme-panel">
+          <header class="extreme-head">
+            <div><span id="extremeKicker">内部方差很大</span><h3 id="extremeTitle">一个“上等马”与一个“下等马”可以同时出现在同队</h3></div>
+            <div class="extreme-averages">
+              <span>蓝方平均 <b id="extremeBlueAvg">1500</b></span>
+              <i>差 <strong id="extremeAvgGap">0</strong></i>
+              <span>红方平均 <b id="extremeRedAvg">1500</b></span>
+            </div>
+          </header>
+
+          <div class="matchup-table">
+            <div class="matchup-labels"><span>蓝方：Rank / MMR</span><b>位置与对位差</b><span>红方：MMR / Rank</span></div>
+            <div class="matchup-row" data-extreme-row="0">
+              <div class="extreme-player blue"><span class="extreme-rank">钻石 IV</span><div class="rating-bar"><i></i></div><b class="extreme-mmr">1700</b></div>
+              <div class="lane-diff"><span>TOP</span><b>+160</b><small>蓝方更高</small></div>
+              <div class="extreme-player red"><b class="extreme-mmr">1540</b><div class="rating-bar"><i></i></div><span class="extreme-rank">翡翠 I</span></div>
+            </div>
+            <div class="matchup-row" data-extreme-row="1">
+              <div class="extreme-player blue"><span class="extreme-rank">翡翠 I</span><div class="rating-bar"><i></i></div><b class="extreme-mmr">1550</b></div>
+              <div class="lane-diff"><span>JNG</span><b>+30</b><small>蓝方更高</small></div>
+              <div class="extreme-player red"><b class="extreme-mmr">1520</b><div class="rating-bar"><i></i></div><span class="extreme-rank">翡翠 II</span></div>
+            </div>
+            <div class="matchup-row" data-extreme-row="2">
+              <div class="extreme-player blue"><span class="extreme-rank">翡翠 III</span><div class="rating-bar"><i></i></div><b class="extreme-mmr">1450</b></div>
+              <div class="lane-diff"><span>MID</span><b>−50</b><small>红方更高</small></div>
+              <div class="extreme-player red"><b class="extreme-mmr">1500</b><div class="rating-bar"><i></i></div><span class="extreme-rank">翡翠 II</span></div>
+            </div>
+            <div class="matchup-row" data-extreme-row="3">
+              <div class="extreme-player blue"><span class="extreme-rank">白金 I</span><div class="rating-bar"><i></i></div><b class="extreme-mmr">1425</b></div>
+              <div class="lane-diff"><span>BOT</span><b>−55</b><small>红方更高</small></div>
+              <div class="extreme-player red"><b class="extreme-mmr">1480</b><div class="rating-bar"><i></i></div><span class="extreme-rank">翡翠 III</span></div>
+            </div>
+            <div class="matchup-row" data-extreme-row="4">
+              <div class="extreme-player blue"><span class="extreme-rank">白金 II</span><div class="rating-bar"><i></i></div><b class="extreme-mmr">1375</b></div>
+              <div class="lane-diff"><span>SUP</span><b>−85</b><small>红方更高</small></div>
+              <div class="extreme-player red"><b class="extreme-mmr">1460</b><div class="rating-bar"><i></i></div><span class="extreme-rank">翡翠 III</span></div>
+            </div>
+          </div>
+
+          <div class="extreme-explanation">
+            <div>
+              <span>这组数字说明什么</span>
+              <p id="extremeMeaning">两队平均值完全相同，但蓝方从 1700 到 1375，内部跨度达到 325。上路会像“上等马”，辅助则像“下等马”。</p>
+            </div>
+            <div>
+              <span>它不能证明什么</span>
+              <p id="extremeBoundary">它不能证明系统为了惩罚某个人而故意配置队友；位置供给、排队时间和玩家池也能产生这种不整齐的组合。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="extreme-warning">
+        <b>阅读方法</b>
+        <p>“上等马/下等马”只是玩家对队内实力离散的比喻，不是 Riot 官方角色标签。连胜后进入更高 MMR 对局、连败后进入更低 MMR 对局，是评分变化的自然方向；要进一步声称存在“连胜制裁”或“败者组”，仍需要额外证据。</p>
+      </div>
+    </section>
+
+    <section class="section simulator-section" id="simulator">
+      <div class="section-heading compact">
+        <p class="eyebrow">03 · LP CALIBRATION LAB</p>
+        <h2>拖动价差，看看 LP 怎么说话</h2>
+        <p>这是机制示意，不是 Riot 公式计算器。它只展示官方描述的方向关系：MMR 高于 Rank 时，上升更快；反之则回调。</p>
+      </div>
+
+      <div class="simulator">
+        <div class="sim-controls">
+          <div class="control-header">
+            <span>隐藏 MMR 相对位置</span>
+            <output id="gapOutput">+120</output>
+          </div>
+          <input id="mmrGap" type="range" min="-300" max="300" value="120" step="10" aria-label="MMR 与 Rank 的相对差值">
+          <div class="range-labels"><span>低于 Rank</span><span>基本一致</span><span>高于 Rank</span></div>
+
+          <div class="scenario-buttons" aria-label="快捷情景">
+            <button data-gap="-220" type="button">段位跑太快</button>
+            <button data-gap="0" type="button">基本匹配</button>
+            <button data-gap="220" type="button">实力待兑现</button>
+          </div>
+          <div class="sim-explanation">
+            <span class="status-dot"></span>
+            <p id="simExplanation">你的 MMR 高于当前 Rank，LP 正在把可见段位向隐藏估计拉近。</p>
+          </div>
+        </div>
+
+        <div class="sim-display">
+          <div class="ladder" aria-hidden="true">
+            <div class="ladder-line"></div>
+            <div class="rank-marker"><span>RANK</span><b>翡翠 II</b></div>
+            <div class="mmr-marker" id="mmrMarker"><span>MMR</span><b id="mmrMarkerText">高 120</b></div>
+          </div>
+          <div class="lp-result">
+            <div><span>胜利预计</span><strong class="win" id="winLp">+27</strong></div>
+            <div><span>失败预计</span><strong class="loss" id="lossLp">−21</strong></div>
+          </div>
+          <p class="formula-caption">方向关系示意 · 实际 LP 还会受赛季、段位保护及队列规则等影响</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section balance-section">
+      <div class="balance-copy">
+        <p class="eyebrow">04 · WHY 50% EMERGES</p>
+        <h2>50% 更像终点附近的地形，<br>不是头顶的一只手。</h2>
+        <p>当你比当前对局池强，胜率会高于 50%，评分随之上升；对手逐渐变强后，优势缩小。到达与你当前能力相称的位置，长期胜率自然趋近均衡。</p>
+        <div class="balance-callout">
+          <b>关键区别</b>
+          <span>“匹配系统寻找你的水平” ≠ “系统强行让每个人每段时间都五五开”</span>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><span>模拟爬升轨迹</span><b id="chartStatus">实力高于当前环境</b></div>
+          <button id="replayChart" type="button">重新播放 ↻</button>
+        </div>
+        <canvas id="convergenceChart" width="760" height="430" aria-label="随着 MMR 上升，预期胜率趋近 50% 的动画曲线"></canvas>
+        <div class="chart-legend"><span><i class="cyan"></i>预期胜率</span><span><i class="gold"></i>MMR</span><span><i class="dash"></i>均衡线 50%</span></div>
+      </div>
+    </section>
+
+    <section class="section formula-section" id="formula">
+      <div class="section-heading">
+        <p class="eyebrow">04B · EXPECTED WIN RATE</p>
+        <h2>为什么分数接近时，<br>期望胜率会靠近 50%？</h2>
+        <p>经典 Elo 用一条逻辑曲线把双方评分差映射成预期胜率。这里用它做教学示意；英雄联盟的真实 MMR 公式并未公开。</p>
+      </div>
+
+      <div class="formula-lab">
+        <div class="equation-panel">
+          <span class="model-badge">ELO 教学模型 · 非 RIOT 公式</span>
+          <div class="equation">
+            <i>P(A) =</i>
+            <span class="fraction"><b>1</b><em>1 + 10<sup>(R<sub>B</sub> − R<sub>A</sub>) / 400</sup></em></span>
+          </div>
+          <p>当双方平均评分相等，指数项为 0，因此双方预期胜率都是 50%。分差越大，曲线才逐渐向一侧倾斜。</p>
+          <label for="teamGap">双方平均隐藏分差 <output id="teamGapOutput">+60</output></label>
+          <input id="teamGap" type="range" min="-200" max="200" value="60" step="5">
+          <div class="range-labels"><span>B 方更高</span><span>完全相等</span><span>A 方更高</span></div>
+        </div>
+
+        <div class="team-balance">
+          <div class="team team-a">
+            <span>蓝方平均 MMR</span>
+            <strong id="teamAMmr">1530</strong>
+            <b id="teamAChance">58.5%</b>
+          </div>
+          <div class="balance-meter">
+            <div class="hundred-window"><span>−100</span><b>建议匹配窗口</b><span>+100</span></div>
+            <div class="meter-track"><i id="gapNeedle"></i></div>
+            <strong id="balanceVerdict">平均分差在 100 以内</strong>
+            <p id="balanceDetail">按经典 Elo 示例，蓝方预期胜率约为 58.5%，红方约为 41.5%。</p>
+          </div>
+          <div class="team team-b">
+            <span>红方平均 MMR</span>
+            <strong id="teamBMmr">1470</strong>
+            <b id="teamBChance">41.5%</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="boundary-note">
+        <b>关于“平均隐藏分差不超过 100”</b>
+        <p>本站可将 ±100 作为解释匹配公平性的模型窗口：超过后标记为“扩大搜索/非理想匹配”。但现有 Riot 材料只公开“尽量让双方平均 MMR 接近”，没有公开一个所有服务器、段位、时段都固定为 100 的硬上限。</p>
+      </div>
+    </section>
+
+    <section class="section myths-section" id="myths">
+      <div class="section-heading compact">
+        <p class="eyebrow">05 · MYTHS UNDER THE LENS</p>
+        <h2>四个常见叙事，逐句拆开</h2>
+        <p>点击一条说法，看看其中哪些部分是真机制，哪一步开始越过证据。</p>
+      </div>
+      <div class="myth-list">
+        <details open>
+          <summary><span>01</span><b>“隐藏分存在，所以账号可以养好或养坏。”</b><i>+</i></summary>
+          <div><p><em>已知：</em>MMR 存在，且会随胜负改变。</p><p><em>缺口：</em>“通过固定套路稳定改善未来队友与对局环境”是额外的因果结论，需要长期对照证据。</p></div>
+        </details>
+        <details>
+          <summary><span>02</span><b>“LP 少赢多输，账号已经废了。”</b><i>+</i></summary>
+          <div><p><em>更朴素的解释：</em>当前 Rank 暂时高于 MMR，LP 在做价差修复。继续稳定赢得超过当前水平的比赛，关系仍会改变。</p></div>
+        </details>
+        <details>
+          <summary><span>03</span><b>“连胜之后必连败，这是系统制裁。”</b><i>+</i></summary>
+          <div><p><em>可替代解释：</em>MMR 上升带来更强对手，同时可能叠加疲劳、心态、英雄池与随机波动。仅凭时间顺序不能证明系统惩罚。</p></div>
+        </details>
+        <details>
+          <summary><span>04</span><b>“胜率回到 50%，说明系统压胜率。”</b><i>+</i></summary>
+          <div><p><em>均衡解释：</em>持续获胜会把你送进更强的对局池；当优势被环境吸收，胜率趋近 50%。继续上升需要能力增长快于匹配强度。</p></div>
+        </details>
+      </div>
+    </section>
+
+    <section class="section model-section">
+      <div class="model-card">
+        <div>
+          <p class="eyebrow">A CAREFUL CONCLUSION</p>
+          <h2>我们知道“它在估计”，<br>但不知道 Riot 的全部公式。</h2>
+        </div>
+        <div class="model-columns">
+          <div><span class="tag verified">官方明确</span><p>MMR 隐藏；胜负改变 MMR；Rank 可见；LP 帮助校准两者；不同队列有不同 MMR。</p></div>
+          <div><span class="tag inferred">合理推断</span><p>现代评分可以被理解为一种持续更新、可能带有不确定性的动态实力估计。</p></div>
+          <div><span class="tag unknown">尚未证明</span><p>英雄联盟直接采用 Elo、Glicko、TrueSkill2 或 Elo‑MMR；“败者组”、按连胜惩罚、可稳定养号套利。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section sources-section">
+      <div class="section-heading compact">
+        <p class="eyebrow">SOURCES & BOUNDARIES</p>
+        <h2>证据从哪里来</h2>
+      </div>
+      <div class="sources">
+        <article><b>Riot Games Support</b><span>MMR, Rank, and LP</span><p>用于确认官方公开的 MMR、Rank、LP 方向关系。用户提供的 PDF 页面日期：2026-05-28。</p></article>
+        <article><b>Glickman</b><span>Parameter Estimation in Large Dynamic Paired Comparison Experiments</span><p>用于解释“评分 + 不确定性”的一般思想，不代表 Riot 使用 Glicko。</p></article>
+        <article><b>Minka, Cleven & Zaykov, 2018</b><span>TrueSkill 2</span><p>展示现代游戏评分如何纳入额外表现信息；不是英雄联盟算法披露。</p></article>
+        <article><b>Ebtekar & Liu, 2021</b><span>Elo-MMR: A Rating System for Massive Multiplayer Competitions</span><p>用于区分 Elo 传统与现代贝叶斯评分系统；名称相似不表示与 LoL MMR 相同。</p></article>
+        <article><b>Riot Data Dragon 16.12.1</b><span>Champion portraits, summoner spell icons & map11</span><p>用于本站峡谷模型中的英雄头像、小地图和技能图标；Riot Games 保留相关权利。</p></article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="brand"><span class="brand-mark">◇</span><span>峡谷天平</span></div>
+    <p>非 Riot Games 官方项目。Riot Games 及《英雄联盟》相关素材归其各自权利人所有。本项目遵循 Riot “Legal Jibber Jabber” 玩家内容政策。</p>
+    <a href="#top">回到顶部 ↑</a>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
