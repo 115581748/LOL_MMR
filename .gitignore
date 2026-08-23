@@ -1,1 +1,15 @@
 release/
+.build/
+english-site/
+__pycache__/
+*.pyc
+data/cache/
+data/pilot_cache/
+data/checkpoints/
+data/replays/*.json
+.secrets/
+.collector/
+assets/.player-case.*.next.js
+assets/.conditional-model.*.next.js
+assets/.model-manifest.*.next.json
+config/*.next

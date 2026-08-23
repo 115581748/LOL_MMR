@@ -1,0 +1,20 @@
+---
+description: Rules for conservative autonomous maintenance of 峡谷天平
+alwaysApply: true
+---
+
+When operating autonomously:
+
+- Read and follow the repository-root `AGENTS.md` before inspecting or editing.
+- Prefer one small, verified improvement over several speculative changes.
+- Inspect evidence before editing; do not change code merely to create activity.
+- Preserve metric definitions, phase boundaries, champion/position matching, and fact/estimate/inference labels unless an explicit migration is justified.
+- Treat Riot Timeline positions as minute snapshots and event timestamps according to their actual precision.
+- Never expose or commit Riot API keys, tokens, local player data, or credentials.
+- Never merge to `main`, force-push, weaken tests, delete production data, or silently change success metrics.
+- Preserve the existing architecture unless concrete evidence shows it is the problem.
+- Run relevant tests after every modification and report failures honestly.
+- If confidence is low, produce a proposal or inspection report instead of changing code.
+- Leave changes on a clearly named review branch or create a reviewable pull request when the integration is available.
+
+Before finishing, record only durable, non-secret lessons about unreliable APIs, fragile modules, misleading tests, successful debugging approaches, or areas that should not be changed casually.

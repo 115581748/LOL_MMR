@@ -353,3 +353,154 @@ $$("details").forEach(item => item.addEventListener("toggle", () => {
   if (!item.open) return;
   $$("details").forEach(other => { if (other !== item) other.open = false; });
 }));
+
+// Minute-by-minute match replay. The bundled example is an anonymized real
+// Match-v5/Timeline-v5 response; production replays use the same schema.
+const replay = window.DEMO_REPLAY;
+if (replay && $("#replayMap")) {
+  const replayState = { minute: Math.min(10, replay.frames.length - 1), participantId: 1, timer: null };
+  const playerById = new Map(replay.players.map(player => [player.participantId, player]));
+  const markerById = new Map();
+
+  const pad = value => String(value).padStart(2, "0");
+  const clock = minute => `${pad(minute)}:00`;
+  const monogram = champion => champion.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
+  const roleLabel = role => ({ TOP: "上路", JUNGLE: "打野", MIDDLE: "中路", BOTTOM: "下路", UTILITY: "辅助" }[role] || role);
+  const clamp = value => Math.max(1.8, Math.min(98.2, value));
+  const mapPoint = player => ({ left: clamp((player.x / 15000) * 100), top: clamp(100 - (player.y / 15000) * 100) });
+  const validPosition = player => Number.isFinite(player?.x) && Number.isFinite(player?.y) && (player.x !== 0 || player.y !== 0);
+  const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const frameAt = minute => replay.frames[Math.max(0, Math.min(replay.frames.length - 1, minute))];
+
+  function makeRoster(teamId, container) {
+    replay.players.filter(player => player.teamId === teamId).forEach(player => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `replay-roster-player ${teamId === 200 ? "red" : ""}`;
+      button.dataset.participantId = player.participantId;
+      button.innerHTML = `<span class="monogram">${monogram(player.champion)}</span><span><b>${player.champion}</b><small>${roleLabel(player.position)}</small></span><em>${player.kills}/${player.deaths}/${player.assists}</em>`;
+      button.addEventListener("click", () => { replayState.participantId = player.participantId; renderReplay(); });
+      container.appendChild(button);
+    });
+  }
+
+  makeRoster(100, $("#replayBlueRoster"));
+  makeRoster(200, $("#replayRedRoster"));
+  replay.players.forEach(player => {
+    const marker = document.createElement("button");
+    marker.type = "button";
+    marker.className = `replay-player-marker ${player.teamId === 200 ? "red" : ""}`;
+    marker.textContent = monogram(player.champion);
+    marker.title = `${player.champion} · ${roleLabel(player.position)}`;
+    marker.setAttribute("aria-label", marker.title);
+    marker.addEventListener("click", () => { replayState.participantId = player.participantId; renderReplay(); });
+    $("#replayMarkerLayer").appendChild(marker);
+    markerById.set(player.participantId, marker);
+  });
+
+  function describeEvent(event) {
+    if (event.type === "CHAMPION_KILL") {
+      const killer = playerById.get(event.killerId)?.champion || "防御塔";
+      const victim = playerById.get(event.victimId)?.champion || "未知玩家";
+      return `${killer} 击杀 ${victim}`;
+    }
+    if (event.type === "ELITE_MONSTER_KILL") {
+      const name = event.monsterType === "DRAGON" ? (event.monsterSubType || "小龙") : event.monsterType === "BARON_NASHOR" ? "纳什男爵" : "峡谷先锋";
+      return `${event.killerTeamId === 100 ? "蓝方" : "红方"}取得 ${name}`;
+    }
+    if (event.type === "BUILDING_KILL") return `${event.teamId === 100 ? "红方" : "蓝方"}摧毁建筑`;
+    if (event.type === "WARD_PLACED") return "放置关键视野";
+    if (event.type === "WARD_KILL") return "排除敌方视野";
+    return event.type;
+  }
+
+  function defaultEventPoint(event) {
+    if (event.position) return event.position;
+    if (event.type === "ELITE_MONSTER_KILL") return event.monsterType === "DRAGON" ? { x: 9866, y: 4414 } : { x: 5007, y: 10471 };
+    return null;
+  }
+
+  function diagnosis(frame, selectedFrame, selectedMeta) {
+    const allies = frame.players.filter(player => {
+      const meta = playerById.get(player.participantId);
+      return meta.teamId === selectedMeta.teamId && player.participantId !== selectedMeta.participantId && validPosition(player) && validPosition(selectedFrame) && distance(player, selectedFrame) <= 2500;
+    }).length;
+    const selectedEvents = frame.events.filter(event => event.killerId === selectedMeta.participantId || event.victimId === selectedMeta.participantId || (event.assistingParticipantIds || []).includes(selectedMeta.participantId));
+    const objective = frame.events.find(event => event.type === "ELITE_MONSTER_KILL");
+    let level = "good", title = "位置与队伍保持基本联系", text = "本分钟没有触发明显的脱节、阵亡或高额未消费金币提示。结合前后分钟继续检查移动方向。";
+    if (selectedEvents.some(event => event.victimId === selectedMeta.participantId)) {
+      level = "danger"; title = "这一分钟发生阵亡";
+      text = `阵亡时附近约有 ${allies} 名队友。建议查看前一分钟的位置，判断是提前进入区域、侧翼过深，还是团队没有同步。`;
+    } else if (objective && allies <= 1 && frame.minute >= 10) {
+      level = "warn"; title = "资源事件发生时与队伍距离较远";
+      text = `${describeEvent(objective)}，而你附近只有 ${allies} 名队友。需要结合另一侧兵线、塔和经济收益判断这是合理交换还是迟到。`;
+    } else if (selectedFrame.currentGold >= 1800) {
+      level = "warn"; title = "持有金币较多，注意回城窗口";
+      text = `这一分钟仍持有 ${selectedFrame.currentGold.toLocaleString()} 金币。若关键资源即将发生，未及时转化为装备会降低即时战斗力。`;
+    } else if (frame.minute >= 15 && allies === 0) {
+      level = "warn"; title = "中期位置较孤立";
+      text = "2,500 游戏单位内没有队友。单带可能合理，但越过河道前应确认敌方位置与下一项资源。";
+    } else if (selectedEvents.some(event => event.killerId === selectedMeta.participantId)) {
+      title = "本分钟完成击杀"; text = "检查这次击杀是否进一步转化为防御塔、视野或史诗资源，而不是只停留在击杀数字。";
+    }
+    return { allies, level, title, text };
+  }
+
+  function renderReplay() {
+    const frame = frameAt(replayState.minute);
+    const selectedMeta = playerById.get(replayState.participantId);
+    const selectedFrame = frame.players.find(player => player.participantId === replayState.participantId) || frame.players[0];
+    const assessment = diagnosis(frame, selectedFrame, selectedMeta);
+    frame.players.forEach(player => {
+      const marker = markerById.get(player.participantId);
+      marker.classList.toggle("active", player.participantId === replayState.participantId);
+      marker.classList.toggle("no-position", !validPosition(player));
+      if (validPosition(player)) {
+        const point = mapPoint(player); marker.style.left = `${point.left}%`; marker.style.top = `${point.top}%`;
+      }
+    });
+    $$(".replay-roster-player").forEach(button => button.classList.toggle("active", Number(button.dataset.participantId) === replayState.participantId));
+    const eventLayer = $("#replayEventLayer"); eventLayer.replaceChildren();
+    frame.events.forEach(event => {
+      const position = defaultEventPoint(event); if (!position) return;
+      const point = mapPoint(position); const ping = document.createElement("i"); ping.className = "replay-event-ping";
+      ping.style.left = `${point.left}%`; ping.style.top = `${point.top}%`; eventLayer.appendChild(ping);
+    });
+    $("#replayRange").value = frame.minute;
+    $("#replayTime").textContent = clock(frame.minute); $("#replayMapMinute").textContent = clock(frame.minute);
+    $("#replayPhase").textContent = frame.minute < 15 ? "前期 · 对线" : frame.minute < 30 ? "中期 · 转线与资源" : "后期 · 团战与终局";
+    $("#diagnosisMonogram").textContent = monogram(selectedMeta.champion);
+    $("#diagnosisMonogram").style.background = selectedMeta.teamId === 100 ? "var(--cyan)" : "#e58470";
+    $("#diagnosisChampion").textContent = selectedMeta.champion; $("#diagnosisRole").textContent = roleLabel(selectedMeta.position);
+    $("#diagnosisLevel").textContent = selectedFrame.level || "—";
+    $("#diagnosisGold").textContent = (selectedFrame.totalGold || 0).toLocaleString();
+    $("#diagnosisCs").textContent = (selectedFrame.minions + selectedFrame.jungleMinions).toLocaleString();
+    $("#diagnosisAllies").textContent = assessment.allies;
+    $("#diagnosisSignal").className = `diagnosis-signal ${assessment.level === "good" ? "" : assessment.level}`;
+    $("#diagnosisTitle").textContent = assessment.title; $("#diagnosisText").textContent = assessment.text;
+    $("#replayEventFeed").textContent = frame.events.length ? frame.events.slice(0, 3).map(describeEvent).join(" · ") : "暂无关键事件";
+  }
+
+  $("#replayMatchId").textContent = `${replay.matchId} · 匿名复盘样例`;
+  $("#replayVersion").textContent = replay.gameVersion.split(".").slice(0, 2).join(".");
+  $("#replayDuration").textContent = `${Math.floor(replay.durationSeconds / 60)}:${pad(replay.durationSeconds % 60)}`;
+  const coordinateCount = replay.frames.reduce((sum, frame) => sum + frame.players.filter(validPosition).length, 0);
+  $("#replayCoverage").textContent = `${coordinateCount}/${replay.frames.length * 10}`;
+  $("#replayRange").max = replay.frames.length - 1; $("#replayRange").value = replayState.minute;
+  $("#replayEndTick").textContent = clock(replay.frames.length - 1);
+  $("#replayRange").addEventListener("input", event => { replayState.minute = Number(event.target.value); renderReplay(); });
+  $("#replayPrev").addEventListener("click", () => { replayState.minute = Math.max(0, replayState.minute - 1); renderReplay(); });
+  $("#replayNext").addEventListener("click", () => { replayState.minute = Math.min(replay.frames.length - 1, replayState.minute + 1); renderReplay(); });
+  $("#replayPlay").addEventListener("click", () => {
+    if (replayState.timer) { clearInterval(replayState.timer); replayState.timer = null; $("#replayPlay").textContent = "播放"; return; }
+    if (replayState.minute >= replay.frames.length - 1) replayState.minute = 0;
+    $("#replayPlay").textContent = "暂停";
+    replayState.timer = setInterval(() => {
+      if (replayState.minute >= replay.frames.length - 1) {
+        clearInterval(replayState.timer); replayState.timer = null; $("#replayPlay").textContent = "播放"; return;
+      }
+      replayState.minute += 1; renderReplay();
+    }, 850);
+  });
+  renderReplay();
+}

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="按英雄、位置、版本和阶段查询 OCE 钻石四以上玩家的稳健分布模型，并以同英雄同位置跨版本基准逐局比较。">
+  <title>高分段条件模型工作台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="conditional-model.css">
+  <link rel="stylesheet" href="conditional-model-overrides.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html"><span>OCE / D4+</span> CONDITIONAL MODEL</a>
+    <div class="load-state"><i></i><span id="modelLoadState">正在读取条件模型</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">HIGH-RANK REFERENCE WORKBENCH</p>
+        <h1>不是一个混合平均值，<br>而是<em>同英雄参考模型</em>。</h1>
+        <p class="hero-copy">按英雄、位置、版本、段位和阶段查看 D4+ 玩家行为分布。逐局案例同时显示你和同位置对手的本局值，并分别匹配双方英雄自己的跨版本高分基准。</p>
+      </div>
+      <div class="hero-stats">
+        <article><span>玩家单局记录</span><strong id="sourceRows">—</strong></article>
+        <article><span>条件分布模型</span><strong id="profileCount">—</strong></article>
+        <article><span>同英雄比较模型</span><strong id="comparisonProfileCount">—</strong></article>
+        <article><span>最低建模样本</span><strong id="minimumSamples">—</strong></article>
+      </div>
+    </section>
+
+    <section class="control-panel">
+      <div class="control-heading"><div><p class="eyebrow">QUERY CONTEXT</p><h2>选择英雄、位置、版本与阶段</h2></div><span>聚合模型不足时自动回退</span></div>
+      <div class="filters">
+        <label><span>英雄</span><select id="championFilter"></select></label>
+        <label><span>位置</span><select id="positionFilter"></select></label>
+        <label><span>版本</span><select id="patchFilter"></select></label>
+        <label><span>段位层</span><select id="rankFilter"></select></label>
+        <label><span>阶段</span><select id="phaseFilter"></select></label>
+      </div>
+      <div class="resolution" id="resolutionPanel"></div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head"><div><p class="eyebrow">ROBUST DISTRIBUTIONS</p><h2>单项指标分布</h2></div><span id="distributionCount">—</span></div>
+      <p class="section-copy">中心以中位数为主，同时保留 P10–P90、MAD、缺失率和 Winsorize 边界。这里描述高分玩家在相同条件下“通常是什么样”，不把统计异常直接判成失误。</p>
+      <p class="section-copy" id="jungleMetricNote" hidden>打野会额外显示对位资源差、有效 Gank、影响路线、团队史诗野怪和相对敌方打野的行动差。“有效 Gank”严格定义为参与击杀非打野目标；Riot 时间线不提供可靠的失败 Gank 事件，因此这里不伪造“尝试次数”。</p>
+      <div class="table-wrap">
+        <table class="metric-table">
+          <thead><tr><th>指标</th><th>高分样本</th><th>P10</th><th>P25</th><th>高分中位数</th><th>P75</th><th>P90</th><th>MAD</th><th>本地玩家中位数</th><th>差值 vs 高分中位数</th><th>经验分位</th></tr></thead>
+          <tbody id="distributionRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="two-column section-block">
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">JOINT BEHAVIOUR</p><h2>阶段行为相关矩阵</h2></div><span>r</span></div>
+        <p>同一个低伤害结果，可能来自经济不足、死亡过早或到场问题。相关矩阵先保留这些联合关系，不急着压成一个总分。</p>
+        <div class="correlation-wrap" id="correlationMatrix"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">TIME SPLIT CHECK</p><h2>时间稳定性</h2></div><span id="stabilityRate">—</span></div>
+        <p>把样本按时间切成前后两半，检查中位数位移是否仍落在可接受的 IQR 比例内。</p>
+        <div class="stability-list" id="stabilityList"></div>
+      </article>
+    </section>
+
+    <section class="section-block case-section">
+      <div class="section-head"><div><p class="eyebrow">LOCAL PLAYER CASE</p><h2><a class="player-link" id="casePlayerLink" href="https://op.gg/lol/summoners/oce/Geolonwe-OC" target="_blank" rel="noreferrer">Geolonwe#OC ↗</a></h2></div><span id="caseStatus">—</span></div>
+      <div class="player-control">
+        <form id="playerSwitchForm">
+          <label for="playerRiotId"><span>切换玩家</span><input id="playerRiotId" name="riotId" type="text" maxlength="81" placeholder="玩家名#TAG 或 OP.GG 链接" autocomplete="off"></label>
+          <button id="playerSwitchButton" type="submit" disabled>切换并更新</button>
+          <button id="playerRefreshButton" class="secondary" type="button" disabled>刷新当前玩家</button>
+        </form>
+        <div class="player-service-state" id="playerServiceState" data-state="checking" aria-live="polite"><i></i><span>正在检查安全更新服务…</span></div>
+      </div>
+      <div class="case-grid">
+        <article class="panel prior-panel">
+          <div class="panel-head"><div><span>COMPARISON RULE</span><h3>只呈现可复算的数据差距</h3></div></div>
+          <div class="prior-list">
+            <div><span>玩家统计量</span><b>逐场指标中位数</b></div>
+            <div><span>比较基线</span><b>D4+ 条件中位数</b></div>
+            <div><span>对位差定义</span><b>玩家本局 − 对手本局</b></div>
+            <div><span>基准差定义</span><b>各方本局 − 各自英雄基准</b></div>
+          </div>
+          <p>正负号仅表示数值方向。例如死亡数为负差值只代表更少死亡；页面不自动把它解释成更好或更差。</p>
+        </article>
+        <article class="panel evidence-panel">
+          <div class="panel-head"><div><span>API EVIDENCE</span><h3>最近 20 场同结构对照</h3></div></div>
+          <div class="case-numbers"><div><span>单双排</span><b id="caseMatches">—</b></div><div><span id="casePrimaryPositionLabel">主位置</span><b id="casePrimaryPositionMatches">—</b></div><div><span id="casePrimaryChampionLabel">主英雄</span><b id="casePrimaryChampionMatches">—</b></div></div>
+          <p id="caseMessage">等待数据。</p>
+        </article>
+      </div>
+      <div class="table-wrap recent-wrap">
+        <table class="metric-table recent-table"><thead><tr><th>场次</th><th>你 / 对位英雄</th><th>位置</th><th>胜负</th><th>15 分钟 CS</th><th>中期 CS</th><th>中期伤害</th><th>后期首个阵亡</th></tr></thead><tbody id="recentMatches"></tbody></table>
+      </div>
+
+      <div class="match-comparison">
+        <div class="section-head comparison-head">
+          <div><p class="eyebrow">MATCH-BY-MATCH GAPS</p><h2>逐局双方数据与英雄基准</h2></div>
+          <label><span>比较阶段</span><select id="caseComparisonPhase"></select></label>
+        </div>
+        <p class="section-copy">每个单元格显示：你的本局值、对手本局值、双方各自英雄的 D4+ 基准中位数、你减对手的对位差，以及双方各自相对基准的差值与经验分位。基准只匹配“该方英雄＋该方位置”，不使用当局经济局势，也不回退到其他英雄；25 分钟后的伤害与承伤按实际 25+ 时长折算为每分钟，25 分钟前的口径保持不变。</p>
+        <div class="comparison-summary" id="matchComparisonSummary">—</div>
+        <div class="table-wrap comparison-wrap">
+          <table class="metric-table match-comparison-table"><thead id="matchComparisonHead"></thead><tbody id="matchComparisonRows"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <aside class="boundary-note"><b>解释边界</b><p>同一场比赛可能贡献多名 D4+ 玩家记录，因此玩家单局并非完全独立；分布和相关矩阵是描述模型，不自动等于因果或正确决策。逐局对手按 Riot 标记的同位置匹配；异常位置或重开局可能没有对手。双方基准都只接受同英雄、同位置的跨版本样本，找不到就明确显示无基准。</p></aside>
+  </main>
+
+  <footer><span>非 Riot Games 官方项目</span><a href="index.html">返回完整指标仪表盘 →</a></footer>
+  <script src="assets/conditional-model-loader.js" data-app="conditional-model-app.js"></script>
+</body>
+</html>

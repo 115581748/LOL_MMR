@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="英雄联盟 OCE 钻石四以上玩家的英雄与位置行为基准可视化。">
+  <title>峡谷行为基准｜高分段参数仪表盘</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="dash-header">
+    <a class="dash-brand" href="#"><span>◇</span> 峡谷行为基准</a>
+    <div class="dataset-state"><i></i><span id="datasetState">正在读取模型</span></div>
+  </header>
+  <main>
+    <section class="dash-hero">
+      <div>
+        <p class="eyebrow">OCE · DIAMOND IV+ · BEHAVIOURAL BENCHMARK</p>
+        <h1>别盯着 CSV。<br><em>看懂一局发生了什么。</em></h1>
+        <p>选择英雄和位置，查看高分段玩家的典型区间。中位数代表“常见表现”，P25–P75 是中间一半样本，而不是必须达到的分数线。</p>
+      </div>
+      <div class="hero-stats">
+        <article><span>玩家单局</span><strong id="rowCount">—</strong><small>真实 API 记录</small></article>
+        <article><span>高分段玩家</span><strong id="playerCount">—</strong><small>当前 D4+</small></article>
+        <article><span>模型参数</span><strong id="parameterCount">—</strong><small>英雄 × 位置 × 指标</small></article>
+      </div>
+    </section>
+    <section class="control-shell" aria-label="模型筛选器">
+      <label><span>英雄</span><select id="championSelect"></select></label>
+      <label><span>位置</span><select id="roleSelect"></select></label>
+      <label class="search-field"><span>查找指标</span><input id="metricSearch" type="search" placeholder="例如：补刀、伤害、视野"></label>
+      <div class="sample-chip"><small>当前最高样本量</small><b id="sampleCount">—</b></div>
+    </section>
+    <section class="profile-shell">
+      <div class="profile-title"><div class="champion-glyph" id="championGlyph">A</div><div><p>当前行为档案</p><h2 id="profileTitle">选择英雄与位置</h2></div></div>
+      <div class="confidence-card"><div><span>数据可靠度</span><b id="confidenceLabel">—</b></div><div class="confidence-track"><i id="confidenceBar"></i></div><p id="confidenceText">样本越多，区间越稳定。</p></div>
+      <div class="phase-nav" role="tablist">
+        <button class="active" data-phase="early">0–15 分钟</button><button data-phase="mid">15–30 分钟</button><button data-phase="late">30 分钟后</button><button data-phase="global">全局指标</button><button data-phase="all">全部</button>
+      </div>
+    </section>
+    <section class="explain-strip">
+      <div><i class="median-key"></i><span><b>中位数</b> 一半样本高于它，一半低于它</span></div>
+      <div><i class="range-key"></i><span><b>典型区间</b> P25–P75，中间 50% 样本</span></div>
+      <div><i class="mean-key"></i><span><b>均值</b> 容易受到极端局影响</span></div>
+    </section>
+    <section class="metrics-section">
+      <div class="section-head"><div><p class="eyebrow" id="phaseEyebrow">EARLY GAME</p><h2 id="phaseTitle">前 15 分钟行为基准</h2></div><span id="visibleMetricCount">—</span></div>
+      <div class="empty-state" id="emptyState" hidden>这个英雄和位置暂时没有足够样本。换一个位置，或继续扩充数据。</div>
+      <div class="metric-grid" id="metricGrid"></div>
+      <button class="load-more" id="loadMore" type="button" hidden>显示更多指标</button>
+    </section>
+    <section class="coverage-section">
+      <div class="section-head"><div><p class="eyebrow">COVERAGE, NOT A LEADERBOARD</p><h2>哪些英雄位置的数据最可靠？</h2></div></div>
+      <p class="coverage-intro">这里只展示样本覆盖度，不给英雄强弱排名。条越长，说明该英雄位置组合的有效玩家单局越多。</p>
+      <div class="coverage-list" id="coverageList"></div>
+    </section>
+    <aside class="boundary-note"><b>阅读边界</b><p>高于基准不一定更好：承伤、死亡和首个阵亡通常更低更理想；伤害与经济也会受位置、阵容、时长和胜负影响。本页是行为参照，不是隐藏 MMR 或单局评分。</p></aside>
+  </main>
+  <footer><span>非 Riot Games 官方项目</span><a href="https://115581748.github.io/">返回主页 →</a></footer>
+  <script src="assets/model-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
