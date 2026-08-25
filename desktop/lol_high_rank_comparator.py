@@ -420,6 +420,78 @@ def replay_frame_at(replay: dict, second: int) -> dict:
     return frames[min(max(0, int(second)) // 60, len(frames) - 1)]
 
 
+def estimated_respawn_seconds(level: int, game_second: int) -> int:
+    """Return a UI-only Summoner's Rift respawn estimate.
+
+    Riot Timeline records the death event precisely, but it does not provide a
+    matching respawn event in ordinary match timelines. Keep this estimate out
+    of model features and label it instead of presenting it as observed fact.
+    """
+    base_by_level = (10, 10, 12, 12, 14, 16, 20, 25, 28, 30, 32, 35, 37, 40, 42, 45, 48, 52)
+    safe_level = min(18, max(1, int(number(level) or 1)))
+    base_seconds = base_by_level[safe_level - 1]
+    # Late-game timers grow with game time. This bounded interpolation is an
+    # intentionally conservative display estimate, not a server timestamp.
+    late_progress = min(1.0, max(0.0, (max(0, int(game_second)) - 15 * 60) / (40 * 60)))
+    return max(1, round(base_seconds * (1.0 + 0.5 * late_progress)))
+
+
+def death_states_at(replay: dict, second: int) -> dict[int, dict]:
+    """Return participants estimated to be dead at ``second``.
+
+    Death timestamp and location are exact Riot CHAMPION_KILL evidence. The
+    respawn boundary is explicitly estimated because Timeline exposes no exact
+    respawn event. If a future payload contains CHAMPION_RESPAWN, it wins.
+    """
+    current_second = max(0, int(second))
+    current_ms = current_second * 1000
+    states: dict[int, dict] = {}
+    for event in replay_events(replay):
+        timestamp_ms = int(number(event.get("timestamp")) or 0)
+        if timestamp_ms > current_ms:
+            break
+        event_type = event.get("type")
+        if event_type == "CHAMPION_RESPAWN":
+            participant_id = int(number(event.get("participantId")) or 0)
+            if participant_id:
+                states.pop(participant_id, None)
+            continue
+        if event_type != "CHAMPION_KILL":
+            continue
+        victim_id = int(number(event.get("victimId")) or 0)
+        if not victim_id:
+            continue
+        death_second = timestamp_ms // 1000
+        death_frame = replay_frame_at(replay, death_second)
+        victim_frame = next((
+            player for player in death_frame.get("players", [])
+            if int(number(player.get("participantId")) or 0) == victim_id
+        ), {})
+        level = min(18, max(1, int(number(victim_frame.get("level")) or 1)))
+        respawn_seconds = estimated_respawn_seconds(level, death_second)
+        respawn_ms = timestamp_ms + respawn_seconds * 1000
+        position = event.get("position") or {}
+        if position.get("x") is None or position.get("y") is None:
+            position = {"x": victim_frame.get("x"), "y": victim_frame.get("y")}
+        states[victim_id] = {
+            "participantId": victim_id,
+            "deathTimestamp": timestamp_ms,
+            "estimatedRespawnTimestamp": respawn_ms,
+            "remainingSeconds": max(0, math.ceil((respawn_ms - current_ms) / 1000)),
+            "level": level,
+            "position": position,
+            "deathObserved": True,
+            "respawnEstimated": True,
+            "source": "Riot CHAMPION_KILL 事件（死亡）+ 规则估计（复活）",
+        }
+
+    return {
+        participant_id: state
+        for participant_id, state in states.items()
+        if current_ms < int(state["estimatedRespawnTimestamp"])
+    }
+
+
 def focus_participant_ids(replay: dict, match: dict) -> tuple[int | None, int | None]:
     """Locate the reviewed player and their positional opponent without account IDs."""
     players = replay.get("players", [])
@@ -1674,11 +1746,20 @@ class ComparatorApp(tk.Tk):
             color = "#45c9ff" if team_id == 100 else "#ff675d"
             for row_index, row in enumerate(team_rows.get(team_id, [])):
                 y = 11 + row_index * 19
+                is_dead = bool(row.get("dead"))
                 canvas.create_rectangle(0, y - 9, max(520, canvas.winfo_width()), y + 9, fill="#0c161c" if row_index % 2 == 0 else "#091116", outline="")
                 champion_icon = self._champion_icon(row["champion"], 18)
                 if champion_icon:
-                    image_id = canvas.create_image(13, y, image=champion_icon)
-                    self._bind_tooltip(canvas, image_id, f"{row['champion']} · {POSITION_NAMES.get(row['position'], row['position'])}")
+                    champion_tag = f"score_champion_{team_id}_{row_index}"
+                    canvas.create_image(13, y, image=champion_icon, tags=(champion_tag,))
+                    if is_dead:
+                        canvas.create_rectangle(4, y - 9, 22, y + 9, fill="#071015", stipple="gray50", outline="#9aa4a9", tags=(champion_tag,))
+                        canvas.create_line(6, y - 7, 20, y + 7, fill="#e2e7e9", width=2, tags=(champion_tag,))
+                        canvas.create_line(20, y - 7, 6, y + 7, fill="#e2e7e9", width=2, tags=(champion_tag,))
+                    tooltip = f"{row['champion']} · {POSITION_NAMES.get(row['position'], row['position'])}"
+                    if is_dead:
+                        tooltip += f"\n已阵亡 · 预计 {row.get('respawnRemaining', 0)} 秒后复活"
+                    self._bind_tooltip(canvas, champion_tag, tooltip)
                 for spell_index, spell_id in enumerate((row.get("summoner1Id"), row.get("summoner2Id"))):
                     spell_icon = self._spell_icon(spell_id, 9)
                     if spell_icon:
@@ -1687,7 +1768,9 @@ class ComparatorApp(tk.Tk):
                         self._bind_tooltip(canvas, image_id, spell_entry.get("name") or str(spell_id))
                 canvas.create_oval(40, y - 7, 54, y + 7, fill="#17242c", outline=color)
                 canvas.create_text(47, y, text=str(row["level"]), fill="#e6f2f5", font=("Consolas", 8, "bold"))
-                canvas.create_text(67, y, text=row["kda"], fill="#dce9ed", font=("Consolas", 9, "bold"), anchor="w")
+                canvas.create_text(67, y, text=row["kda"], fill="#88969c" if is_dead else "#dce9ed", font=("Consolas", 9, "bold"), anchor="w")
+                if is_dead:
+                    canvas.create_text(119, y, text=f"☠~{row.get('respawnRemaining', 0)}s", fill="#d7a7a0", font=("Consolas", 8, "bold"), anchor="w")
                 self._draw_cs_icon(canvas, 145, y, color)
                 canvas.create_text(157, y, text=str(row["cs"]), fill="#dce9ed", font=("Consolas", 9, "bold"), anchor="w")
                 canvas.create_oval(196, y - 5, 206, y + 5, fill="#d7a93c", outline="#f5d37f")
@@ -2158,6 +2241,7 @@ class ComparatorApp(tk.Tk):
         public_players = {player.get("participantId"): player for player in self.replay_data.get("players", [])}
         objectives = objective_snapshot(self.replay_data, current_second)
         tab_state = tab_snapshot(self.replay_data, current_second)
+        death_states = death_states_at(self.replay_data, current_second)
         situation = replay_situation_snapshot(self.replay_data, match, current_second)
         situation["objectiveLossAnalysis"] = loss_analysis
         self._draw_map_layer_context(situation, current_second)
@@ -2198,19 +2282,48 @@ class ComparatorApp(tk.Tk):
                 outline = "#f4ca68"
             elif layer_mode == "COMPARE" and is_opponent:
                 outline = "#c292ff"
-            location = map_coordinates(player_frame.get("x"), player_frame.get("y"), self.map_width, self.map_height)
+            death_state = death_states.get(participant_id)
+            map_position = death_state.get("position", {}) if death_state else player_frame
+            location = map_coordinates(map_position.get("x"), map_position.get("y"), self.map_width, self.map_height)
             if location:
                 x, y = location
                 champion_icon = self._champion_icon(player.get("champion"), icon_size)
                 if champion_icon:
-                    image_id = self.map_canvas.create_image(x, y, image=champion_icon, tags=("replay_marker",))
+                    champion_tag = f"map_champion_{participant_id}"
+                    self.map_canvas.create_image(x, y, image=champion_icon, tags=("replay_marker", champion_tag))
                     radius = icon_size / 2
-                    self.map_canvas.create_oval(x - radius, y - radius, x + radius, y + radius, outline=outline, width=3 if is_focus or is_opponent else 2, tags=("replay_marker",))
+                    if death_state:
+                        self.map_canvas.create_oval(
+                            x - radius, y - radius, x + radius, y + radius,
+                            fill="#071015", stipple="gray50", outline="#a7b0b4", width=2,
+                            tags=("replay_marker", champion_tag),
+                        )
+                        self.map_canvas.create_line(
+                            x - radius * 0.65, y - radius * 0.65, x + radius * 0.65, y + radius * 0.65,
+                            fill="#eef1f2", width=3, tags=("replay_marker", champion_tag),
+                        )
+                        self.map_canvas.create_line(
+                            x + radius * 0.65, y - radius * 0.65, x - radius * 0.65, y + radius * 0.65,
+                            fill="#eef1f2", width=3, tags=("replay_marker", champion_tag),
+                        )
+                        self.map_canvas.create_text(
+                            x, y + radius + 9, text=f"☠ 预计 {death_state['remainingSeconds']}s",
+                            fill="#e0b4ae", font=("Microsoft YaHei UI", 8, "bold"),
+                            tags=("replay_marker", champion_tag),
+                        )
+                    else:
+                        self.map_canvas.create_oval(x - radius, y - radius, x + radius, y + radius, outline=outline, width=3 if is_focus or is_opponent else 2, tags=("replay_marker", champion_tag))
                     if is_focus:
                         self.map_canvas.create_oval(x - radius - 4, y - radius - 4, x + radius + 4, y + radius + 4, outline="#f4ca68", width=1, dash=(3, 3), tags=("replay_marker",))
-                    self._bind_tooltip(self.map_canvas, image_id, f"{player.get('champion')} · {POSITION_NAMES.get(player.get('position'), player.get('position'))}")
+                    tooltip = f"{player.get('champion')} · {POSITION_NAMES.get(player.get('position'), player.get('position'))}"
+                    if death_state:
+                        tooltip += (
+                            f"\n已阵亡 · 预计 {death_state['remainingSeconds']} 秒后复活"
+                            "\n死亡时间/地点：Riot 事件 · 复活时间：估计"
+                        )
+                    self._bind_tooltip(self.map_canvas, champion_tag, tooltip)
                 else:
-                    self.map_canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill=color, outline=outline, width=2, tags=("replay_marker",))
+                    self.map_canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill="#303b40" if death_state else color, outline="#a7b0b4" if death_state else outline, width=2, tags=("replay_marker",))
             lane_cs = int(number(player_frame.get("minions")) or 0)
             jungle_cs = int(number(player_frame.get("jungleMinions")) or 0)
             player_tab = tab_state.get(participant_id, {"kills": 0, "deaths": 0, "assists": 0, "items": []})
@@ -2223,6 +2336,8 @@ class ComparatorApp(tk.Tk):
                 "kda": f"{player_tab['kills']}/{player_tab['deaths']}/{player_tab['assists']}",
                 "cs": lane_cs + jungle_cs, "gold": int(number(player_frame.get("totalGold")) or 0),
                 "items": player_tab["items"],
+                "dead": bool(death_state),
+                "respawnRemaining": death_state.get("remainingSeconds", 0) if death_state else 0,
             })
 
         self._render_scoreboard(team_rows)

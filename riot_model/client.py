@@ -53,7 +53,12 @@ class RiotClient:
                 return json.loads(cache.read_text(encoding="utf-8"))
         query = urllib.parse.urlencode(params or {})
         url = f"https://{route}.api.riotgames.com{path}" + (f"?{query}" if query else "")
-        request = urllib.request.Request(url, headers={"X-Riot-Token": self.api_key, "User-Agent": "lol-behaviour-benchmark/0.1"})
+        request = urllib.request.Request(url, headers={"User-Agent": "lol-behaviour-benchmark/0.1"})
+        # Request.add_header() title-cases this to ``X-riot-token``. Although
+        # HTTP field names are case-insensitive, Riot's current OC1 gateway
+        # returns 401 for that spelling while accepting the documented exact
+        # ``X-Riot-Token`` spelling. Direct assignment preserves it on the wire.
+        request.headers["X-Riot-Token"] = self.api_key
         for attempt in range(10):
             try:
                 with urllib.request.urlopen(request, timeout=30) as response:

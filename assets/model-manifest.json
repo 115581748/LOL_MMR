@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": "398216df320b2bb7",
-  "generatedAtUtc": "2026-08-20T02:55:38.014816+00:00",
+  "revision": "ea3302f5ccead587",
+  "generatedAtUtc": "2026-08-24T10:39:49.775041+00:00",
   "assets": {
     "core": "assets/model-data.js",
     "extras": "assets/model-extras.js",
@@ -116,10 +116,10 @@
     },
     "player_case": {
       "enabled": true,
-      "riot_id": "Geolonwe",
-      "tag_line": "OC",
+      "riot_id": "FL4SHB4CK",
+      "tag_line": "XDD",
       "matches": 20,
-      "auto_refresh_minutes": 2
+      "auto_refresh_minutes": 1
     },
     "dashboard": {
       "metric_initial_limit": 12,

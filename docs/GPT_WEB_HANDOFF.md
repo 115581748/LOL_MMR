@@ -37,6 +37,8 @@ GPT_WEB_HANDOFF.md、AGENTS.md、README.md 和 desktop/lol_high_rank_comparator.
 
 团战同样不是 Riot 原始事件。程序将至少三次英雄击杀、相邻间隔不超过 15 秒的序列聚类为 `DERIVED_TEAMFIGHT`，保留原始击杀时间戳、参与者、双方击杀比、位置、置信度和规则来源，并可作为丢龙/先锋的上游证据。
 
+地图死亡态由精确的 `CHAMPION_KILL` 时间戳和地点触发，地图与 TAB 头像都会灰化并打叉。普通 Timeline 没有精确复活事件，`estimated_respawn_seconds` 只生成明确标注为“预计”的界面倒计时，不得作为观测事实或模型特征。
+
 ## 不包含的内容
 
 交接包故意排除：

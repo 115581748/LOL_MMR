@@ -64,6 +64,19 @@ class PipelineTests(unittest.TestCase):
         ]), patch("riot_model.client.time.sleep"):
             self.assertEqual(client._get("oc1", "/test"), {"ok": True})
 
+    def test_riot_client_preserves_documented_token_header_case(self):
+        client = RiotClient("test-key")
+
+        def open_request(request, timeout):
+            headers = dict(request.header_items())
+            self.assertEqual(timeout, 30)
+            self.assertEqual(headers.get("X-Riot-Token"), "test-key")
+            self.assertNotIn("X-riot-token", headers)
+            return io.BytesIO(b'{"ok": true}')
+
+        with patch("riot_model.client.urllib.request.urlopen", side_effect=open_request):
+            self.assertEqual(client._get("oc1", "/test"), {"ok": True})
+
     def test_diamond_plus_enumerates_all_oce_tiers_with_ttl(self):
         class FakeClient:
             def __init__(self):

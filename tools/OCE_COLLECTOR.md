@@ -25,7 +25,7 @@ Set-Content -LiteralPath .secrets\riot_api_key.txt -Value "RGAPI-新生成的Key
 # 后台启动：每轮结束六小时后再次刷新
 powershell -ExecutionPolicy Bypass -File tools\oce_collector.ps1 -Action start
 
-# 查看状态、样本行数和日志位置
+# 查看实际进程状态、心跳、样本行数和日志位置
 powershell -ExecutionPolicy Bypass -File tools\oce_collector.ps1 -Action status
 
 # 前台只运行一轮，适合确认新 Key
@@ -44,3 +44,14 @@ powershell -ExecutionPolicy Bypass -File tools\oce_collector.ps1 -Action stop
 阶段边界也在配置中参数化。当前 `conditional_model.late_phase_start_minute=25`，因此每轮采集后会从缓存 Timeline 重算 15–25 分钟中期指标和 25 分钟后指标，而不是只修改网页标签。
 
 运行状态写在 `.collector/state.json`；日志和 PID 也位于 `.collector/`。这些文件以及 `.secrets/` 都不会进入 Git。
+
+## 运行状态与恢复
+
+常驻进程由独立心跳进程每 15 秒写入 `.collector/heartbeat.json`。`status` 不会只相信上一次写入的文字状态，而会同时核对 PID 和心跳：
+
+- `collecting` / `materializing` / `modelling` / `publishing`：当前真实阶段，进程与心跳正常。
+- `idle` / `retry_wait` / `waiting_for_key`：本轮结束后等待下一次刷新、失败重试或新 Key。
+- `crashed`：状态文件说采集器在运行，但记录的 PID 已不存在。
+- `unresponsive`：进程仍存在，但心跳超过 60 秒没有更新。
+
+运行 `-Action start` 时会先移除已经没有对应进程的陈旧 PID，然后从稳定键去重的 JSONL 断点继续。单个采集周期内的 API 或建模步骤失败后，常驻进程会记录 `last_completed_step` 和 `next_retry_at`，等待后自动重试。如果常驻进程本身已终止，需要重新执行 `-Action start`；心跳只负责检测，不会隐式拉起新进程。

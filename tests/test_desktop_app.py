@@ -4,8 +4,10 @@ from desktop.lol_high_rank_comparator import (
     approximate_percentile,
     blend_hex,
     comparison_rows,
+    death_states_at,
     detected_teamfight_events,
     estimated_minion_waves,
+    estimated_respawn_seconds,
     format_clock,
     focus_participant_ids,
     map_coordinates,
@@ -220,6 +222,39 @@ class DesktopAppTests(unittest.TestCase):
         self.assertEqual(tab_snapshot(replay, 35)[1]["kills"], 1)
         self.assertEqual(tab_snapshot(replay, 35)[6]["deaths"], 1)
         self.assertEqual(tab_snapshot(replay, 45)[1]["items"], [])
+
+    def test_death_state_uses_exact_event_position_and_estimated_respawn(self):
+        replay = {
+            "frames": [
+                {
+                    "timestamp": 9 * 60_000,
+                    "players": [{"participantId": 6, "x": 7000, "y": 7000, "level": 8}],
+                    "events": [],
+                },
+                {
+                    "timestamp": 10 * 60_000,
+                    "players": [{"participantId": 6, "x": 7300, "y": 7200, "level": 9}],
+                    "events": [{
+                        "type": "CHAMPION_KILL", "timestamp": 605_500,
+                        "killerId": 1, "victimId": 6,
+                        "position": {"x": 9100, "y": 4300},
+                    }],
+                },
+            ],
+        }
+
+        self.assertEqual(death_states_at(replay, 605), {})
+        state = death_states_at(replay, 606)[6]
+        self.assertEqual(state["position"], {"x": 9100, "y": 4300})
+        self.assertTrue(state["deathObserved"])
+        self.assertTrue(state["respawnEstimated"])
+        self.assertGreater(state["remainingSeconds"], 0)
+        self.assertEqual(death_states_at(replay, 700), {})
+
+    def test_respawn_estimate_is_bounded_and_grows_late(self):
+        self.assertEqual(estimated_respawn_seconds(1, 5 * 60), 10)
+        self.assertEqual(estimated_respawn_seconds(99, 5 * 60), 52)
+        self.assertEqual(estimated_respawn_seconds(18, 55 * 60), 78)
 
     def test_minion_wave_estimate_uses_spawn_cadence(self):
         self.assertEqual(estimated_minion_waves(64), [])
