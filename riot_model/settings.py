@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+import json
+from copy import deepcopy
+from pathlib import Path
+
+
+DEFAULT_SETTINGS = {
+    "schema_version": 1,
+    "collection": {
+        "platform": "oc1",
+        "population": "diamond-plus",
+        "interval_minutes": 360,
+        "matches_per_player": 20,
+        "match_history_count": 100,
+        "league_cache_max_age_minutes": 60,
+    },
+    "model": {
+        "minimum_samples": 5,
+        "outlier_iqr_multiplier": 1.5,
+        "dragon_window_seconds": 45,
+        "dragon_pit_x": 9866,
+        "dragon_pit_y": 4414,
+        "dragon_radius": 3400,
+        "teamfight_gap_seconds": 15,
+        "teamfight_min_kills": 3,
+        "starter_purchase_seconds": 120,
+        "core_item_min_gold": 1600,
+        "categorical_top_k": 8,
+    },
+    "conditional_model": {
+        "minimum_group_samples": 20,
+        "comparison_minimum_samples": 3,
+        "late_phase_start_minute": 25,
+        "high_confidence_samples": 100,
+        "medium_confidence_samples": 50,
+        "winsor_lower_quantile": 0.01,
+        "winsor_upper_quantile": 0.99,
+        "stability_iqr_tolerance": 0.25,
+    },
+    "player_case": {
+        "enabled": True,
+        "riot_id": "Geolonwe",
+        "tag_line": "OC",
+        "matches": 20,
+        "auto_refresh_minutes": 10,
+    },
+    "dashboard": {
+        "metric_initial_limit": 12,
+        "metric_load_more": 24,
+        "table_initial_limit": 80,
+        "table_load_more": 80,
+        "coverage_limit": 20,
+        "item_slot_limit": 4,
+        "confidence_thresholds": [
+            {"min_samples": 50, "label": "较高", "css_class": "good", "bar_percent": 100},
+            {"min_samples": 30, "label": "中等", "css_class": "medium", "bar_percent": 72},
+            {"min_samples": 20, "label": "初步", "css_class": "medium", "bar_percent": 52},
+            {"min_samples": 0, "label": "探索性", "css_class": "", "bar_percent": 30},
+        ],
+    },
+}
+
+
+def _merge(base: dict, override: dict) -> dict:
+    result = deepcopy(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def load_settings(path: str | Path = "config/model-parameters.json") -> dict:
+    source = Path(path)
+    if not source.exists():
+        return deepcopy(DEFAULT_SETTINGS)
+    return _merge(DEFAULT_SETTINGS, json.loads(source.read_text(encoding="utf-8")))

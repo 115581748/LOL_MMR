@@ -18,8 +18,11 @@
       <span>峡谷天平</span>
     </a>
     <nav aria-label="章节导航">
+      <a href="model-dashboard.html">行为基准</a>
+      <a href="conditional-model.html">玩家案例</a>
       <a href="#layers">四层机制</a>
       <a href="#rift-model">峡谷模型</a>
+      <a href="#match-replay">单局复盘</a>
       <a href="#extreme-cases">极端对局</a>
       <a href="#simulator">LP 模拟器</a>
       <a href="#myths">叙事拆解</a>
@@ -274,6 +277,96 @@
       </div>
     </section>
 
+    <section class="section replay-section" id="match-replay">
+      <div class="section-heading replay-heading">
+        <div>
+          <p class="eyebrow">03 · MINUTE-BY-MINUTE MATCH REPLAY</p>
+          <h2>每一分钟，十名玩家都在地图上。</h2>
+        </div>
+        <p>用 Riot Match-v5 Timeline 的真实分钟帧重建对局。拖动时间轴查看十名玩家的坐标、经济、等级与关键事件；它是赛后数据复盘，不是逐秒录像。</p>
+      </div>
+
+      <div class="replay-lab">
+        <header class="replay-toolbar">
+          <div>
+            <span class="live-source"><i></i> RIOT TIMELINE RECONSTRUCTION</span>
+            <strong id="replayMatchId">载入对局…</strong>
+          </div>
+          <div class="replay-toolbar-stats">
+            <span>版本 <b id="replayVersion">—</b></span>
+            <span>时长 <b id="replayDuration">—</b></span>
+            <span>坐标覆盖 <b id="replayCoverage">—</b></span>
+          </div>
+        </header>
+
+        <div class="replay-workspace">
+          <aside class="replay-roster" aria-label="本局十名玩家">
+            <div class="roster-team-title blue"><span>BLUE SIDE</span><b>蓝方</b></div>
+            <div id="replayBlueRoster" class="replay-roster-list"></div>
+            <div class="roster-team-title red"><span>RED SIDE</span><b>红方</b></div>
+            <div id="replayRedRoster" class="replay-roster-list"></div>
+          </aside>
+
+          <div class="replay-map-column">
+            <div class="replay-map" id="replayMap">
+              <img src="assets/map11.png" alt="召唤师峡谷每分钟位置重建图">
+              <div class="map-grid" aria-hidden="true"></div>
+              <div id="replayEventLayer" class="replay-event-layer" aria-hidden="true"></div>
+              <div id="replayMarkerLayer" class="replay-marker-layer"></div>
+              <div class="map-minute-stamp"><small>TIMELINE FRAME</small><b id="replayMapMinute">00:00</b></div>
+              <div class="map-source-note">坐标为该分钟最近一帧 · 不插值</div>
+            </div>
+            <div class="replay-legend">
+              <span><i class="blue"></i>蓝方</span>
+              <span><i class="red"></i>红方</span>
+              <span><i class="selected"></i>选中玩家</span>
+              <small>点击地图标记或左侧玩家切换分析对象</small>
+            </div>
+          </div>
+
+          <aside class="replay-diagnosis">
+            <span class="diagnosis-label">SELECTED PLAYER</span>
+            <div class="diagnosis-player">
+              <div id="diagnosisMonogram">—</div>
+              <div><b id="diagnosisChampion">选择玩家</b><span id="diagnosisRole">—</span></div>
+            </div>
+            <div class="diagnosis-metrics">
+              <div><span>等级</span><b id="diagnosisLevel">—</b></div>
+              <div><span>总金币</span><b id="diagnosisGold">—</b></div>
+              <div><span>补刀</span><b id="diagnosisCs">—</b></div>
+              <div><span>附近队友</span><b id="diagnosisAllies">—</b></div>
+            </div>
+            <div class="diagnosis-signal" id="diagnosisSignal">
+              <span>本分钟提示</span>
+              <strong id="diagnosisTitle">选择时间点开始复盘</strong>
+              <p id="diagnosisText">系统会根据位置、队友距离、持有金币与地图事件生成可核查的规则提示。</p>
+            </div>
+            <div class="diagnosis-boundary">
+              <b>解释边界</b>
+              <p>公开 API 只有分钟级坐标。这里可以诊断区域、脱节和资源窗口，不能判断走位微操或复原完整视野。</p>
+            </div>
+          </aside>
+        </div>
+
+        <footer class="replay-controls">
+          <div class="replay-buttons">
+            <button id="replayPrev" type="button" aria-label="上一分钟">−1</button>
+            <button id="replayPlay" class="replay-play" type="button" aria-label="播放时间线">播放</button>
+            <button id="replayNext" type="button" aria-label="下一分钟">+1</button>
+          </div>
+          <div class="replay-scrubber">
+            <div><span id="replayPhase">前期 · 对线</span><b id="replayTime">00:00</b></div>
+            <input id="replayRange" type="range" min="0" max="19" value="10" step="1" aria-label="选择对局分钟">
+            <div class="replay-ticks"><span>00:00</span><span>15:00</span><span id="replayEndTick">结束</span></div>
+          </div>
+          <div class="replay-events">
+            <span>本分钟事件</span>
+            <div id="replayEventFeed">暂无关键事件</div>
+          </div>
+        </footer>
+      </div>
+    </section>
+
     <section class="section extreme-section" id="extreme-cases">
       <div class="section-heading">
         <p class="eyebrow">02B · EXTREME MATCH EXAMPLES</p>
@@ -516,6 +609,7 @@
     <a href="#top">回到顶部 ↑</a>
   </footer>
 
+  <script src="assets/demo-replay.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

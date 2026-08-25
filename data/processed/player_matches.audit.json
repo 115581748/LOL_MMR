@@ -1,0 +1,20 @@
+{
+  "checkpoint": {
+    "source": "data\\checkpoints\\player_matches.jsonl",
+    "physical_lines": 122782,
+    "unique_player_matches": 122782,
+    "duplicate_rows_removed": 0,
+    "conflicting_duplicate_rows": 0,
+    "blank_lines_removed": 0,
+    "invalid_json_lines_removed": 0,
+    "missing_identity_lines_removed": 0,
+    "clean_output": null
+  },
+  "processed_csv": {
+    "source": "data\\processed\\player_matches.csv",
+    "rows": 122782,
+    "unique_player_matches": 122782,
+    "duplicate_rows": 0,
+    "missing_identity_rows": 0
+  }
+}

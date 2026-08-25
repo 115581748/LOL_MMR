@@ -1,0 +1,231 @@
+.filters {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.metric-table {
+  min-width: 1180px;
+}
+
+.gap-value {
+  color: var(--ink);
+}
+
+.gap-value small {
+  color: var(--muted);
+}
+
+.player-link {
+  border-bottom: 1px solid rgba(99, 230, 226, .45);
+}
+
+.player-link:hover {
+  color: var(--cyan);
+}
+
+.player-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  margin: 24px 0 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: linear-gradient(120deg, rgba(99, 230, 226, .055), transparent 55%), var(--panel);
+}
+
+.player-control form {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.player-control label span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.player-control input {
+  width: 100%;
+  height: 42px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  outline: 0;
+  background: #091015;
+  color: var(--ink);
+  font: 600 12px var(--display);
+}
+
+.player-control input:focus {
+  border-color: rgba(99, 230, 226, .65);
+}
+
+.player-control button {
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--cyan);
+  background: var(--cyan);
+  color: #061014;
+  font: 700 10px var(--display);
+  cursor: pointer;
+}
+
+.player-control button.secondary {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
+.player-control button:disabled {
+  cursor: not-allowed;
+  opacity: .4;
+}
+
+.player-service-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 300px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.player-service-state i {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.player-service-state[data-state="online"] i { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+.player-service-state[data-state="busy"] i { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+.player-service-state[data-state="error"] i,
+.player-service-state[data-state="offline"] i { background: var(--red); }
+
+.match-comparison {
+  margin-top: 64px;
+  padding-top: 48px;
+  border-top: 1px solid var(--line);
+}
+
+.comparison-head {
+  align-items: end;
+}
+
+.comparison-head label {
+  min-width: 170px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.comparison-head label span,
+.baseline-cell small,
+.match-comparison-table td > small {
+  display: block;
+  color: var(--muted);
+  font: 500 8px var(--body);
+}
+
+.baseline-cell > span {
+  display: block;
+  padding: 3px 0;
+}
+
+.baseline-cell > span + span {
+  margin-top: 4px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+
+.baseline-cell strong {
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.comparison-head select {
+  width: 100%;
+  margin-top: 4px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: 600 12px var(--display);
+}
+
+.comparison-head option {
+  background: var(--panel);
+}
+
+.comparison-summary {
+  margin-top: 18px;
+  padding: 11px 14px;
+  border-left: 3px solid var(--cyan);
+  background: #091015;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.match-comparison-table {
+  min-width: 1700px;
+}
+
+.match-comparison-table th:nth-child(-n+5),
+.match-comparison-table td:nth-child(-n+5) {
+  text-align: left;
+}
+
+.match-comparison-table td b {
+  display: block;
+  color: var(--ink);
+}
+
+.comparison-metric {
+  min-width: 190px;
+}
+
+.comparison-metric b {
+  display: flex !important;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--gold) !important;
+  font-size: 13px;
+}
+
+.comparison-metric em {
+  display: block;
+  margin-top: 5px;
+  color: var(--cyan);
+  font: 500 8px var(--display);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.comparison-metric em span {
+  display: block;
+  margin-top: 2px;
+}
+
+.comparison-metric.missing,
+.no-baseline {
+  color: var(--muted);
+}
+
+@media (max-width: 680px) {
+  .player-control,
+  .player-control form {
+    grid-template-columns: 1fr;
+  }
+
+  .player-service-state {
+    max-width: none;
+  }
+
+  .comparison-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

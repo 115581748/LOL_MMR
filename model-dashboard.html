@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="英雄联盟 OCE 钻石四以上玩家的英雄与位置行为基准可视化。">
+  <title>峡谷行为基准｜高分段参数仪表盘</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="model-dashboard.css">
+  <link rel="stylesheet" href="model-dashboard-extras.css">
+</head>
+<body>
+  <header class="dash-header">
+    <a class="dash-brand" href="index.html"><span>◇</span> 峡谷行为基准</a>
+    <div class="dataset-state"><i></i><span id="datasetState">正在读取模型</span></div>
+  </header>
+  <main>
+    <section class="dash-hero">
+      <div>
+        <p class="eyebrow">OCE · DIAMOND IV+ · BEHAVIOURAL BENCHMARK</p>
+        <h1>别盯着 CSV。<br><em>看懂一局发生了什么。</em></h1>
+        <p>选择英雄和位置，查看高分段玩家的典型区间。中位数代表“常见表现”，P25–P75 是中间一半样本，而不是必须达到的分数线。</p>
+      </div>
+      <div class="hero-stats">
+        <article><span>玩家单局</span><strong id="rowCount">—</strong><small>真实 API 记录</small></article>
+        <article><span>高分段玩家</span><strong id="playerCount">—</strong><small>当前 D4+</small></article>
+        <article><span>数值参数</span><strong id="parameterCount">—</strong><small>分位数与均值模型</small></article>
+        <article><span>枚举档案</span><strong id="enumProfileCount">—</strong><small>出装、符文与对局类型</small></article>
+      </div>
+    </section>
+    <section class="control-shell" aria-label="模型筛选器">
+      <label><span>英雄</span><select id="championSelect"></select></label>
+      <label><span>位置</span><select id="roleSelect"></select></label>
+      <label class="search-field"><span>查找指标</span><input id="metricSearch" type="search" placeholder="例如：补刀、伤害、视野"></label>
+      <div class="sample-chip"><small>当前最高样本量</small><b id="sampleCount">—</b></div>
+    </section>
+    <section class="profile-shell">
+      <div class="profile-title"><div class="champion-glyph" id="championGlyph">A</div><div><p>当前行为档案</p><h2 id="profileTitle">选择英雄与位置</h2></div></div>
+      <div class="confidence-card"><div><span>数据可靠度</span><b id="confidenceLabel">—</b></div><div class="confidence-track"><i id="confidenceBar"></i></div><p id="confidenceText">样本越多，区间越稳定。</p></div>
+      <div class="phase-nav" role="tablist">
+        <button class="active" data-phase="early">0–15 分钟</button><button data-phase="mid">15–25 分钟</button><button data-phase="late">25 分钟后</button><button data-phase="dragon">龙团</button><button data-phase="global">全局指标</button><button data-phase="all">全部数值</button>
+      </div>
+    </section>
+    <section class="explain-strip">
+      <div><i class="median-key"></i><span><b>中位数</b> 一半样本高于它，一半低于它</span></div>
+      <div><i class="range-key"></i><span><b>典型区间</b> P25–P75，中间 50% 样本</span></div>
+      <div><i class="mean-key"></i><span><b>均值</b> 容易受到极端局影响</span></div>
+    </section>
+    <section class="metrics-section">
+      <div class="section-head"><div><p class="eyebrow" id="phaseEyebrow">EARLY GAME</p><h2 id="phaseTitle">前 15 分钟行为基准</h2></div><span id="visibleMetricCount">—</span></div>
+      <div class="empty-state" id="emptyState" hidden>这个英雄和位置暂时没有足够样本。换一个位置，或继续扩充数据。</div>
+      <div class="metric-grid" id="metricGrid"></div>
+      <button class="load-more" id="loadMore" type="button" hidden>显示更多指标</button>
+    </section>
+    <section class="insight-section build-section" id="builds">
+      <div class="section-head"><div><p class="eyebrow">ENUMERABLE PROFILES</p><h2>出装顺序与可枚举选择</h2></div><span id="enumerableCount">—</span></div>
+      <p class="section-intro">这里不再对物品 ID 求平均，而是保留每局真实选择并统计出现频率。成装顺序按时间线中最终装备的首次获得时间重建；低频组合不会被包装成“推荐答案”。</p>
+      <div class="enumerable-grid">
+        <article class="data-panel panel-wide"><div class="panel-heading"><div><span>BUILD ORDER</span><h3>核心成装与结算装备顺序</h3></div><small>按首次获得时间</small></div><div id="buildOrderPanel" class="sequence-list"></div></article>
+        <article class="data-panel"><div class="panel-heading"><div><span>STARTING BUY</span><h3>起手购买</h3></div><small>0–2 分钟</small></div><div id="starterPanel" class="sequence-list compact"></div></article>
+        <article class="data-panel"><div class="panel-heading"><div><span>FINAL INVENTORY</span><h3>常见最终装备</h3></div><small>不计饰品栏</small></div><div id="finalBuildPanel" class="sequence-list compact"></div></article>
+        <article class="data-panel"><div class="panel-heading"><div><span>SUMMONER SPELLS</span><h3>召唤师技能组合</h3></div></div><div id="summonerPanel" class="choice-list"></div></article>
+        <article class="data-panel"><div class="panel-heading"><div><span>RUNE PAGE</span><h3>基石与副系</h3></div></div><div id="runePanel" class="choice-list"></div></article>
+        <article class="data-panel"><div class="panel-heading"><div><span>SAMPLE ENUMS</span><h3>版本、段位与胜负</h3></div></div><div id="sampleEnumPanel" class="choice-list"></div></article>
+        <article class="data-panel panel-wide"><div class="panel-heading"><div><span>ITEM SLOT DISTRIBUTIONS</span><h3>结算栏位的物品分布</h3></div><small>物品栏 1–6 + 饰品栏</small></div><div id="itemSlotPanel" class="slot-grid"></div></article>
+      </div>
+    </section>
+    <section class="insight-section dragon-section" id="dragon-fights">
+      <div class="section-head"><div><p class="eyebrow">OBJECTIVE WINDOW MODEL</p><h2>龙团：从时间线推断，而不是凭印象</h2></div><span class="method-chip" id="dragonMethod">龙团参数加载中</span></div>
+      <p class="section-intro">把每次击杀小龙视为一个目标窗口，再寻找其前后 45 秒内、龙坑附近的英雄击杀。该口径能枚举参团、击杀、死亡和控龙结果，但不能复原完整视野、语音决策或没有人头发生的拉扯。</p>
+      <div id="dragonStatGrid" class="dragon-stat-grid"></div>
+      <div class="dragon-splits">
+        <article class="data-panel"><div class="panel-heading"><div><span>DRAGON TYPES</span><h3>己方获得的龙种</h3></div></div><div id="dragonTypePanel" class="choice-list"></div></article>
+        <article class="data-panel"><div class="panel-heading"><div><span>WINDOW OUTCOMES</span><h3>目标窗口结果</h3></div></div><div id="dragonOutcomePanel" class="choice-list"></div></article>
+      </div>
+    </section>
+    <section class="insight-section all-data-section" id="all-data">
+      <div class="section-head"><div><p class="eyebrow">COMPLETE FIELD EXPLORER</p><h2>全部可用数值字段</h2></div><span id="allMetricCount">—</span></div>
+      <p class="section-intro">包含稳定阶段指标、Match-v5 结算字段、Riot Challenges、布尔发生率以及本页从时间线派生的龙团/团战字段。ID 型字段转入上方枚举分布，避免把物品编号的平均值误当作有意义的数值。</p>
+      <div class="all-data-controls">
+        <label><span>字段类别</span><select id="metricCategory"></select></label>
+        <label><span>搜索字段名</span><input id="allMetricSearch" type="search" placeholder="例如 dragon、damage、ward、击杀"></label>
+        <label class="zero-toggle"><input id="showZeroMetrics" type="checkbox" checked><span>显示全零字段</span></label>
+      </div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>指标</th><th>来源</th><th>样本</th><th>P25</th><th>中位数</th><th>均值</th><th>P75</th></tr></thead>
+          <tbody id="allMetricRows"></tbody>
+        </table>
+      </div>
+      <button class="load-more" id="allMetricMore" type="button" hidden>显示更多字段</button>
+    </section>
+    <section class="coverage-section">
+      <div class="section-head"><div><p class="eyebrow">COVERAGE, NOT A LEADERBOARD</p><h2>哪些英雄位置的数据最可靠？</h2></div></div>
+      <p class="coverage-intro">这里只展示样本覆盖度，不给英雄强弱排名。条越长，说明该英雄位置组合的有效玩家单局越多。</p>
+      <div class="coverage-list" id="coverageList"></div>
+    </section>
+    <aside class="boundary-note"><b>阅读边界</b><p>高于基准不一定更好：承伤、死亡和首个阵亡通常更低更理想；伤害与经济也会受位置、阵容、时长和胜负影响。本页是行为参照，不是隐藏 MMR 或单局评分。</p></aside>
+  </main>
+  <footer><span>非 Riot Games 官方项目</span><a href="conditional-model.html">打开条件模型工作台 →</a></footer>
+  <script src="assets/model-loader.js" data-app="model-dashboard.js"></script>
+</body>
+</html>
